@@ -252,16 +252,25 @@ public class FunctionComputeClientTest {
         System.out.println("CustomDomain " + customDomainName + " is deleted");
     }
 
+    private TriggerMetadata[] listTriggers(String serviceName, String functionName) {
+        ListTriggersRequest listReq = new ListTriggersRequest(serviceName,
+                functionName);
+
+        ListTriggersResponse listResp = client.listTriggers(listReq);
+
+        assertFalse(Strings.isNullOrEmpty(listResp.getRequestId()));
+
+        return listResp.getTriggers();
+    }
+
     private void cleanUpFunctions(String serviceName) {
         ListFunctionsRequest listFReq = new ListFunctionsRequest(serviceName);
         ListFunctionsResponse listFResp = client.listFunctions(listFReq);
         FunctionMetadata[] functions = listFResp.getFunctions();
 
         for (FunctionMetadata function : functions) {
-            ListTriggersRequest listReq = new ListTriggersRequest(serviceName,
-                function.getFunctionName());
-            ListTriggersResponse listTResp = client.listTriggers(listReq);
-            cleanUpTriggers(serviceName, function.getFunctionName(), listTResp.getTriggers());
+            TriggerMetadata[] triggers = listTriggers(serviceName, function.getFunctionName());
+            cleanUpTriggers(serviceName, function.getFunctionName(), triggers);
             System.out.println(
                 "All triggers for Function " + function.getFunctionName() + " are deleted");
             DeleteFunctionRequest deleteFReq = new DeleteFunctionRequest(serviceName,
@@ -601,13 +610,11 @@ public class FunctionComputeClientTest {
         createHttpTrigger(TRIGGER_NAME, ANONYMOUS, new HttpMethod[]{GET, POST});
 
         // List Triggers
-        ListTriggersRequest listTReq = new ListTriggersRequest(SERVICE_NAME, FUNCTION_NAME);
-        ListTriggersResponse listTResp = client.listTriggers(listTReq);
+        TriggerMetadata[] triggers = listTriggers(SERVICE_NAME, FUNCTION_NAME);
 
-        assertFalse(Strings.isNullOrEmpty(listTResp.getRequestId()));
-        assertEquals(1, listTResp.getTriggers().length);
+        assertEquals(1, triggers.length);
 
-        TriggerMetadata trigger = listTResp.getTriggers()[0];
+        TriggerMetadata trigger = triggers[0];
 
         assertEquals(TRIGGER_NAME, trigger.getTriggerName());
         assertEquals("http", trigger.getTriggerType());
@@ -1014,32 +1021,28 @@ public class FunctionComputeClientTest {
     @Test
     public void testListTriggersValidate() {
         try {
-            ListTriggersRequest request = new ListTriggersRequest(null, FUNCTION_NAME);
-            client.listTriggers(request);
+            listTriggers(null, FUNCTION_NAME);
             fail("ClientException is expected");
         } catch (ClientException e) {
             assertTrue(e.getMessage().contains(VALIDATE_MSG));
         }
 
         try {
-            ListTriggersRequest request = new ListTriggersRequest("", FUNCTION_NAME);
-            client.listTriggers(request);
+            listTriggers("", FUNCTION_NAME);
             fail("ClientException is expected");
         } catch (ClientException e) {
             assertTrue(e.getMessage().contains(VALIDATE_MSG));
         }
 
         try {
-            ListTriggersRequest request = new ListTriggersRequest(SERVICE_NAME, null);
-            client.listTriggers(request);
+            listTriggers(SERVICE_NAME, null);
             fail("ClientException is expected");
         } catch (ClientException e) {
             assertTrue(e.getMessage().contains(VALIDATE_MSG));
         }
 
         try {
-            ListTriggersRequest request = new ListTriggersRequest(SERVICE_NAME, "");
-            client.listTriggers(request);
+            listTriggers(SERVICE_NAME, "");
             fail("ClientException is expected");
         } catch (ClientException e) {
             assertTrue(e.getMessage().contains(VALIDATE_MSG));
@@ -1639,11 +1642,10 @@ public class FunctionComputeClientTest {
             createOssTrigger(TRIGGER_NAME, tfPrefix, tfSuffix);
 
             // List Triggers
-            ListTriggersRequest listTReq = new ListTriggersRequest(SERVICE_NAME, FUNCTION_NAME);
-            ListTriggersResponse listTResp = client.listTriggers(listTReq);
-            assertFalse(Strings.isNullOrEmpty(listTResp.getRequestId()));
-            assertEquals(1, listTResp.getTriggers().length);
-            TriggerMetadata triggerOld = listTResp.getTriggers()[0];
+            TriggerMetadata[] triggers = listTriggers(SERVICE_NAME, FUNCTION_NAME);
+
+            assertEquals(1, triggers.length);
+            TriggerMetadata triggerOld = triggers[0];
             assertEquals(TRIGGER_NAME, triggerOld.getTriggerName());
 
             // Update Trigger
@@ -1771,11 +1773,10 @@ public class FunctionComputeClientTest {
         client.createTrigger(createTReq);
 
         // List Triggers
-        ListTriggersRequest listTReq = new ListTriggersRequest(SERVICE_NAME, FUNCTION_NAME);
-        ListTriggersResponse listTResp = client.listTriggers(listTReq);
-        assertFalse(Strings.isNullOrEmpty(listTResp.getRequestId()));
-        assertEquals(1, listTResp.getTriggers().length);
-        TriggerMetadata triggerOld = listTResp.getTriggers()[0];
+        TriggerMetadata[] triggers = listTriggers(SERVICE_NAME, FUNCTION_NAME);
+
+        assertEquals(1, triggers.length);
+        TriggerMetadata triggerOld = triggers[0];
         assertEquals(triggerName, triggerOld.getTriggerName());
 
         Thread.sleep(300);
@@ -1839,26 +1840,22 @@ public class FunctionComputeClientTest {
                     new LogTriggerConfig.JobConfig().setMaxRetryTime(3).setTriggerInterval(60)).
                 setLogConfig(new LogTriggerConfig.LogConfig("", "")).
                 setFunctionParameter(new HashMap<String, Object>()).setEnable(true);
-        CreateTriggerRequest createTReq = new CreateTriggerRequest(SERVICE_NAME, FUNCTION_NAME);
-        createTReq.setTriggerName(triggerName);
-        createTReq.setTriggerType(TRIGGER_TYPE_LOG);
-        createTReq.setInvocationRole(INVOCATION_ROLE);
-        createTReq.setSourceArn(LOG_SOURCE_ARN);
-        createTReq.setTriggerConfig(triggerConfig);
-        client.createTrigger(createTReq);
+
+        createLogTrigger(triggerName, triggerConfig);
 
         // List Triggers
-        ListTriggersRequest listTReq = new ListTriggersRequest(SERVICE_NAME, FUNCTION_NAME);
-        ListTriggersResponse listTResp = client.listTriggers(listTReq);
-        assertFalse(Strings.isNullOrEmpty(listTResp.getRequestId()));
-        assertEquals(1, listTResp.getTriggers().length);
-        TriggerMetadata triggerOld = listTResp.getTriggers()[0];
+        TriggerMetadata[] triggers = listTriggers(SERVICE_NAME, FUNCTION_NAME);
+
+        assertEquals(1, triggers.length);
+        TriggerMetadata triggerOld = triggers[0];
+
         assertEquals(triggerName, triggerOld.getTriggerName());
 
         try {
             Thread.sleep(1000);
         } catch (InterruptedException e) {
         }
+
         UpdateTriggerRequest req = new UpdateTriggerRequest(SERVICE_NAME, FUNCTION_NAME,
             triggerName);
         req.setInvocationRole(INVOCATION_ROLE);
@@ -1902,6 +1899,15 @@ public class FunctionComputeClientTest {
 
         // Delete Trigger
         deleteTrigger(SERVICE_NAME, FUNCTION_NAME, triggerName);
+    }
+
+    private CreateTriggerResponse createTimeTrigger(String triggerName, TimeTriggerConfig timeTriggerConfig) {
+        CreateTriggerRequest createTReq = new CreateTriggerRequest(SERVICE_NAME, FUNCTION_NAME);
+        createTReq.setTriggerName(triggerName);
+        createTReq.setTriggerType(TRIGGER_TYPE_TIMER);
+        createTReq.setTriggerConfig(timeTriggerConfig);
+
+        return client.createTrigger(createTReq);
     }
 
     @Test
@@ -1977,22 +1983,23 @@ public class FunctionComputeClientTest {
         Gson gson = new Gson();
 
         // Create Trigger
-        CreateTriggerRequest createTReq = new CreateTriggerRequest(SERVICE_NAME, FUNCTION_NAME);
         TimeTriggerConfig timeTriggerConfig = new TimeTriggerConfig(cronEvery, payload, true);
-        createTReq.setTriggerName(triggerName);
-        createTReq.setTriggerType(TRIGGER_TYPE_TIMER);
-        createTReq.setTriggerConfig(timeTriggerConfig);
-        CreateTriggerResponse createTriggerResponse = client.createTrigger(createTReq);
+
+        CreateTriggerResponse createTriggerResponse = createTimeTrigger(triggerName, timeTriggerConfig);
+
         assertEquals(triggerName, createTriggerResponse.getTriggerName());
         assertEquals(TRIGGER_TYPE_TIMER, createTriggerResponse.getTriggerType());
+
         String createTime = createTriggerResponse.getCreatedTime();
         String lastModifiedTime = createTriggerResponse.getLastModifiedTime();
         TimeTriggerConfig tRConfig = gson
             .fromJson(gson.toJson(createTriggerResponse.getTriggerConfig()),
                 TimeTriggerConfig.class);
+
         assertEquals(timeTriggerConfig.getCronExpression(), tRConfig.getCronExpression());
         assertEquals(timeTriggerConfig.getPayload(), tRConfig.getPayload());
         assertEquals(timeTriggerConfig.isEnable(), tRConfig.isEnable());
+
         // Get Trigger
         GetTriggerRequest getTReq = new GetTriggerRequest(SERVICE_NAME, FUNCTION_NAME, triggerName);
         GetTriggerResponse getTResp = client.getTrigger(getTReq);
@@ -2007,11 +2014,11 @@ public class FunctionComputeClientTest {
         assertEquals(createTime, getTResp.getCreatedTime());
         assertEquals(lastModifiedTime, getTResp.getLastModifiedTime());
         // List Triggers
-        ListTriggersRequest listTReq = new ListTriggersRequest(SERVICE_NAME, FUNCTION_NAME);
-        ListTriggersResponse listTResp = client.listTriggers(listTReq);
-        assertFalse(Strings.isNullOrEmpty(listTResp.getRequestId()));
-        assertEquals(1, listTResp.getTriggers().length);
-        TriggerMetadata triggerOld = listTResp.getTriggers()[0];
+        TriggerMetadata[] triggers = listTriggers(SERVICE_NAME, FUNCTION_NAME);
+
+
+        assertEquals(1, triggers.length);
+        TriggerMetadata triggerOld = triggers[0];
         assertEquals(triggerName, triggerOld.getTriggerName());
 
         try {
