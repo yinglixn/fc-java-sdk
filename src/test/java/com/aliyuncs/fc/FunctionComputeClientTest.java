@@ -150,15 +150,16 @@ public class FunctionComputeClientTest {
     private static final String SECRET_KEY = System.getenv("SECRET_KEY");
     private static final String ACCOUNT_ID = System.getenv("ACCOUNT_ID");
     private static final String CODE_BUCKET = System.getenv("CODE_BUCKET");
-    private static final String CODE_OBJECT = System.getenv("CODE_OBJECT");
     private static final String INVOCATION_ROLE = System.getenv("INVOCATION_ROLE");
     private static final String LOG_PROJECT = System.getenv("LOG_PROJECT");
     private static final String LOG_STORE = System.getenv("LOG_STORE");
+    private static final String RDS_TABLE = System.getenv("RDS_TABLE");
     private static final String VPC_ID = System.getenv("VPC_ID");
     private static final String VSWITCH_IDS = System.getenv("VSWITCH_IDS");
     private static final String SECURITY_GROUP_ID = System.getenv("SECURITY_GROUP_ID");
     private static final String USER_ID = System.getenv("USER_ID");
     private static final String GROUP_ID = System.getenv("GROUP_ID");
+    private static final String DB_INSTANCE_ID = System.getenv("DB_INSTANCE_ID");
     private static final String NAS_SERVER_ADDR = System.getenv("NAS_SERVER_ADDR");
     private static final String NAS_MOUNT_DIR = System.getenv("NAS_MOUNT_DIR");
 
@@ -168,6 +169,9 @@ public class FunctionComputeClientTest {
         String.format("acs:log:%s:%s:project/%s", REGION, ACCOUNT_ID, LOG_PROJECT);
     private static final String CDN_SOURCE_ARN =
         String.format("acs:cdn:*:%s", ACCOUNT_ID);
+    private static final String RDS_SOURCE_ARN =
+            String.format("acs:rds:%s:%s:dbinstance/%s", REGION, ACCOUNT_ID, DB_INSTANCE_ID);
+
     private static final String SERVICE_NAME = "testServiceJavaSDK";
     private static final String SERVICE_DESC_OLD = "service desc";
     private static final String SERVICE_DESC_NEW = "service desc updated";
@@ -178,6 +182,7 @@ public class FunctionComputeClientTest {
     private static final String TRIGGER_TYPE_OSS = "oss";
     private static final String TRIGGER_TYPE_HTTP = "http";
     private static final String TRIGGER_TYPE_LOG = "log";
+    private static final String TRIGGER_TYPE_RDS = "rds";
     private static final String TRIGGER_TYPE_CDN = "cdn_events";
     private static final String TRIGGER_TYPE_TIMER = "timer";
     private static final String CUSTOMDOMAIN_NAME = "javasdk.cn-hongkong.1221968287646227.cname-test.fc.aliyun-inc.com";
@@ -1704,6 +1709,7 @@ public class FunctionComputeClientTest {
         testLogTrigger();
         testTimeTrigger();
         testCdnEventsTrigger();
+        testRdsTrigger();
 
         // Delete Function
         DeleteFunctionRequest deleteFReq = new DeleteFunctionRequest(SERVICE_NAME, FUNCTION_NAME);
@@ -1829,6 +1835,103 @@ public class FunctionComputeClientTest {
 
         // Delete Trigger
         deleteTrigger(SERVICE_NAME, FUNCTION_NAME, triggerName);
+    }
+
+    private CreateTriggerResponse createRdsTrigger(String triggerName, RdsTriggerConfig triggerConfig) {
+        CreateTriggerRequest createTReq = new CreateTriggerRequest(SERVICE_NAME, FUNCTION_NAME);
+        createTReq.setTriggerName(triggerName);
+        createTReq.setTriggerType(TRIGGER_TYPE_RDS);
+        createTReq.setInvocationRole(INVOCATION_ROLE);
+        createTReq.setSourceArn(RDS_SOURCE_ARN);
+        createTReq.setTriggerConfig(triggerConfig);
+        return client.createTrigger(createTReq);
+    }
+
+    private void testRdsTrigger() throws ParseException {
+        String triggerName = TRIGGER_TYPE_RDS + "_" + TRIGGER_NAME;
+        RdsTriggerConfig triggerConfig = new RdsTriggerConfig(RDS_TABLE, 1, 1, "json");
+
+        createRdsTrigger(triggerName, triggerConfig);
+
+        // List Triggers
+        TriggerMetadata[] triggers = listTriggers(SERVICE_NAME, FUNCTION_NAME);
+        assertEquals(1, triggers.length);
+        TriggerMetadata triggerOld = triggers[0];
+        assertEquals(triggerName, triggerOld.getTriggerName());
+
+        // update trigger
+
+        triggerConfig.setRetry(2);
+        triggerConfig.setConcurrency(2);
+        triggerConfig.setEventFormat("protobuf");
+
+        UpdateTriggerRequest req = new UpdateTriggerRequest(SERVICE_NAME, FUNCTION_NAME,
+                triggerName);
+        req.setInvocationRole(INVOCATION_ROLE);
+        req.setTriggerConfig(triggerConfig);
+
+
+        UpdateTriggerResponse updateTResp = client.updateTrigger(req);
+        assertEquals(triggerOld.getTriggerName(), updateTResp.getTriggerName());
+        assertEquals(triggerOld.getInvocationRole(), updateTResp.getInvocationRole());
+        assertEquals(triggerOld.getSourceArn(), updateTResp.getSourceArn());
+
+        Gson gson = new Gson();
+        RdsTriggerConfig tcOld = gson
+                .fromJson(gson.toJson(triggerOld.getTriggerConfig()), RdsTriggerConfig.class);
+        RdsTriggerConfig tcNew = gson
+                .fromJson(gson.toJson(updateTResp.getTriggerConfig()), RdsTriggerConfig.class);
+
+        assertEquals(triggerOld.getCreatedTime(), updateTResp.getCreatedTime());
+        assertEquals(triggerOld.getTriggerType(), updateTResp.getTriggerType());
+        assertEquals(triggerOld.getInvocationRole(), updateTResp.getInvocationRole());
+
+        assertEquals(tcOld.getConcurrency(), tcNew.getConcurrency());
+        assertEquals(tcOld.getEventFormat(), tcNew.getEventFormat());
+        assertEquals(tcOld.getRetry(), tcNew.getRetry());
+        assertNotEquals(tcOld.getTables(), tcNew.getTables());
+
+        Date dateOld = DATE_FORMAT.parse(triggerOld.getLastModifiedTime());
+        Date dateNew = DATE_FORMAT.parse(updateTResp.getLastModifiedTime());
+        assertTrue(dateOld.before(dateNew));
+
+        // Get Trigger
+        GetTriggerRequest getTReq = new GetTriggerRequest(SERVICE_NAME, FUNCTION_NAME,
+                triggerName);
+        GetTriggerResponse getTResp = client.getTrigger(getTReq);
+        RdsTriggerConfig getTConfig = gson
+                .fromJson(gson.toJson(getTResp.getTriggerConfig()), RdsTriggerConfig.class);
+        assertFalse(Strings.isNullOrEmpty(getTResp.getRequestId()));
+        assertEquals(triggerName, getTResp.getTriggerName());
+        assertEquals(LOG_SOURCE_ARN, getTResp.getSourceARN());
+        assertEquals(TRIGGER_TYPE_LOG, getTResp.getTriggerType());
+        assertEquals(2, getTConfig.getConcurrency().intValue());
+        assertEquals(2, getTConfig.getRetry().intValue());
+
+
+        // Delete Trigger
+        deleteTrigger(SERVICE_NAME, FUNCTION_NAME, triggerName);
+    }
+
+    private CreateTriggerResponse createLogTrigger(String triggerName, LogTriggerConfig triggerConfig) {
+
+        CreateTriggerRequest createTReq = new CreateTriggerRequest(SERVICE_NAME, FUNCTION_NAME);
+        createTReq.setTriggerName(triggerName);
+        createTReq.setTriggerType(TRIGGER_TYPE_LOG);
+        createTReq.setInvocationRole(INVOCATION_ROLE);
+        createTReq.setSourceArn(LOG_SOURCE_ARN);
+        createTReq.setTriggerConfig(triggerConfig);
+        CreateTriggerResponse resp = client.createTrigger(createTReq);
+
+        /*try { // todo:
+            // Add some sleep since OSS notifications create is not strongly consistent
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }*/
+
+
+        return resp;
     }
 
     private void testLogTrigger() throws ParseException {
