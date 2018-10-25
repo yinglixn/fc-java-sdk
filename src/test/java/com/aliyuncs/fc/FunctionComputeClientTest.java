@@ -8,6 +8,7 @@ import static com.aliyuncs.fc.model.HttpMethod.HEAD;
 import static com.aliyuncs.fc.model.HttpMethod.POST;
 import static com.aliyuncs.fc.model.HttpMethod.PUT;
 import static java.util.Arrays.asList;
+import static java.util.Arrays.deepEquals;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertFalse;
 import static junit.framework.TestCase.assertNull;
@@ -635,7 +636,7 @@ public class FunctionComputeClientTest {
         assertFalse(Strings.isNullOrEmpty(getTResp.getRequestId()));
         assertEquals(TRIGGER_NAME, getTResp.getTriggerName());
         assertEquals(TRIGGER_TYPE_HTTP, getTResp.getTriggerType());
-        assertTrue(Arrays.deepEquals(new HttpMethod[]{GET, POST}, triggerConfig.getMethods()));
+        assertTrue(deepEquals(new HttpMethod[]{GET, POST}, triggerConfig.getMethods()));
 
         // update http trigger
         GetTriggerResponse triggerOld = getTResp;
@@ -656,7 +657,7 @@ public class FunctionComputeClientTest {
             .fromJson(gson.toJson(triggerOld.getTriggerConfig()), HttpTriggerConfig.class);
         HttpTriggerConfig tcNew = gson
             .fromJson(gson.toJson(updateTResp.getTriggerConfig()), HttpTriggerConfig.class);
-        assertFalse(Arrays.deepEquals(tcOld.getMethods(), tcNew.getMethods()));
+        assertFalse(deepEquals(tcOld.getMethods(), tcNew.getMethods()));
         assertNotEquals(tcOld.getAuthType(), tcNew.getAuthType());
 
         assertEquals(triggerOld.getCreatedTime(), updateTResp.getCreatedTime());
@@ -1674,7 +1675,7 @@ public class FunctionComputeClientTest {
                 .fromJson(gson.toJson(triggerOld.getTriggerConfig()), OSSTriggerConfig.class);
             OSSTriggerConfig tcNew = gson
                 .fromJson(gson.toJson(updateTResp.getTriggerConfig()), OSSTriggerConfig.class);
-            assertFalse(Arrays.deepEquals(tcOld.getEvents(), tcNew.getEvents()));
+            assertFalse(deepEquals(tcOld.getEvents(), tcNew.getEvents()));
             assertNotEquals(tcOld.getFilter().getKey().getPrefix(),
                 tcNew.getFilter().getKey().getPrefix());
             assertNotEquals(tcOld.getFilter().getKey().getSuffix(),
@@ -1700,7 +1701,7 @@ public class FunctionComputeClientTest {
             assertEquals(newInvocationRole, getTResp.getInvocationRole());
             assertEquals(tfPrefixNew, getTConfig.getFilter().getKey().getPrefix());
             assertEquals(tfSuffixNew, getTConfig.getFilter().getKey().getSuffix());
-            assertTrue(Arrays.deepEquals(eventsNew, getTConfig.getEvents()));
+            assertTrue(deepEquals(eventsNew, getTConfig.getEvents()));
 
             // Delete Trigger
             deleteTrigger(SERVICE_NAME, FUNCTION_NAME, TRIGGER_NAME);
@@ -1849,7 +1850,7 @@ public class FunctionComputeClientTest {
 
     private void testRdsTrigger() throws ParseException {
         String triggerName = TRIGGER_TYPE_RDS + "_" + TRIGGER_NAME;
-        RdsTriggerConfig triggerConfig = new RdsTriggerConfig(RDS_TABLE, 1, 1, "json");
+        RdsTriggerConfig triggerConfig = new RdsTriggerConfig(new String[]{RDS_TABLE}, 1, 1, "json");
 
         createRdsTrigger(triggerName, triggerConfig);
 
@@ -1886,10 +1887,10 @@ public class FunctionComputeClientTest {
         assertEquals(triggerOld.getTriggerType(), updateTResp.getTriggerType());
         assertEquals(triggerOld.getInvocationRole(), updateTResp.getInvocationRole());
 
-        assertEquals(tcOld.getConcurrency(), tcNew.getConcurrency());
-        assertEquals(tcOld.getEventFormat(), tcNew.getEventFormat());
-        assertEquals(tcOld.getRetry(), tcNew.getRetry());
-        assertNotEquals(tcOld.getTables(), tcNew.getTables());
+        assertNotEquals(tcOld.getConcurrency(), tcNew.getConcurrency());
+        assertNotEquals(tcOld.getEventFormat(), tcNew.getEventFormat());
+        assertNotEquals(tcOld.getRetry(), tcNew.getRetry());
+        Assert.assertFalse(deepEquals(tcOld.getSubscriptionObjects(), tcNew.getSubscriptionObjects()));
 
         Date dateOld = DATE_FORMAT.parse(triggerOld.getLastModifiedTime());
         Date dateNew = DATE_FORMAT.parse(updateTResp.getLastModifiedTime());

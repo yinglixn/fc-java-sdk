@@ -2,7 +2,7 @@ package com.aliyuncs.fc.model;
 
 public class RdsTriggerConfig {
 
-    private String tables;
+    private String[] subscriptionObjects;
 
     private Integer retry;
 
@@ -10,8 +10,8 @@ public class RdsTriggerConfig {
 
     private String eventFormat;
 
-    public RdsTriggerConfig(String tables, Integer retry, Integer concurrency, String eventFormat) {
-        this.tables = tables;
+    public RdsTriggerConfig(String[] subscriptionObjects, Integer retry, Integer concurrency, String eventFormat) {
+        this.subscriptionObjects = subscriptionObjects;
         this.retry = retry;
         this.concurrency = concurrency;
         this.eventFormat = eventFormat;
@@ -29,10 +29,6 @@ public class RdsTriggerConfig {
         return eventFormat;
     }
 
-    public String getTables() {
-        return tables;
-    }
-
     public void setConcurrency(Integer concurrency) {
         this.concurrency = concurrency;
     }
@@ -45,7 +41,11 @@ public class RdsTriggerConfig {
         this.retry = retry;
     }
 
-    public void setTables(String tables) {
-        this.tables = tables;
+    public void setSubscriptionObjects(String[] subscriptionObjects) {
+        this.subscriptionObjects = subscriptionObjects;
+    }
+
+    public String[] getSubscriptionObjects() {
+        return subscriptionObjects;
     }
 }
